@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TNVS Adviser - Multi-Subject Grading, Report Cards & Lesson Plans</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top right, #1e1b4b 0%, #0f172a 40%, #030712 100%);
+            background-attachment: fixed;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px -10px rgba(99, 102, 241, 0.15);
+        }
+
+        .glass-input {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+        }
+        .glass-input:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+            outline: none;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.6); }
+
+        .bubble {
+            width: 28px; height: 28px; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700; cursor: pointer;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            background: rgba(30, 41, 59, 0.8);
+            color: #94a3b8;
+        }
+        .bubble:hover {
+            border-color: #818cf8;
+            color: #ffffff;
+            transform: scale(1.1);
+        }
+        .bubble-selected {
+            background: #4f46e5 !important;
+            color: white !important;
+            border-color: #818cf8 !important;
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
+        }
+        .bubble-correct {
+            background: #10b981 !important;
+            color: white !important;
+            border-color: #34d399 !important;
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+        }
+        .bubble-wrong {
+            background: #ef4444 !important;
+            color: white !important;
+            border-color: #f87171 !important;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; color: black !important; }
+            .glass-panel, .glass-card { background: white !important; color: black !important; border: 1px solid #ccc !important; box-shadow: none !important; }
+            #printable-lesson-doc { display: block !important; }
+            #lesson-form-container { display: none !important; }
+        }
+        .print-only { display: none; }
+    </style>
+</head>
+<body class="text-slate-100 antialiased min-h-screen flex flex-col bg-slate-950">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none no-print"></div>
+
+    <!-- LOGIN SCREEN OVERLAY -->
+    <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
+        <div class="relative w-full max-w-md bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-800">
+            <div class="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 p-8 text-white text-center relative border-b border-slate-800">
+                <div class="inline-flex items-center justify-center w-14 h-14 bg-indigo-600/30 border border-indigo-400/40 rounded-2xl mb-3 text-2xl shadow-glow">
+                    <i class="fa-solid fa-graduation-cap text-indigo-300"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold tracking-tight">TNVS Adviser<span class="text-indigo-400">Portal</span></h2>
+                <p class="text-xs text-slate-400 mt-1">Multi-Subject Grading, Report Cards & Lesson Plans</p>
+            </div>
+
+            <form id="login-form" onsubmit="handleLogin(event)" class="p-8 space-y-5">
+                <div id="login-error-alert" class="hidden bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold p-3 rounded-xl flex items-center space-x-2">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-400 text-sm"></i>
+                    <span id="login-error-msg">Invalid credentials. Please try again.</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Username / Email</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3.5 top-3.5 text-slate-500 text-xs"></i>
+                        <input type="text" id="login-username" value="admin" required placeholder="Enter username" class="w-full glass-input pl-9 pr-3 py-2.5 text-xs font-semibold rounded-xl focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-500 text-xs"></i>
+                        <input type="password" id="login-password" value="admin123" required placeholder="Enter password" class="w-full glass-input pl-9 pr-10 py-2.5 text-xs font-semibold rounded-xl focus:outline-none">
+                        <button type="button" onclick="togglePasswordVisibility('login-password', 'toggle-pass-icon')" class="absolute right-3.5 top-3 text-slate-400 hover:text-slate-200 text-xs">
+                            <i id="toggle-pass-icon" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold py-3 rounded-xl shadow-lg transition text-xs flex items-center justify-center space-x-2 cursor-pointer">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Authenticate & Access Dashboard</span>
+                </button>
+
+                <div class="pt-3 border-t border-slate-800 text-center">
+                    <div class="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-3 text-center space-y-1.5">
+                        <p class="text-[11px] text-indigo-300 font-extrabold uppercase tracking-wider flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-key text-indigo-400"></i> Pre-filled Default Credentials
+                        </p>
+                        <div class="flex items-center justify-center space-x-3 text-xs font-mono font-extrabold text-slate-200">
+                            <span class="bg-slate-800 px-2 py-1 rounded border border-slate-700">User: <strong class="text-indigo-400">admin</strong></span>
+                            <span class="bg-slate-800 px-2 py-1 rounded border border-slate-700">Pass: <strong class="text-indigo-400">admin123</strong></span>
+                        </div>
+                        <button type="button" onclick="fillAndLoginDefault()" class="mt-1 text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline block w-full text-center">
+                            Click here to Quick-Login Instantly
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APPLICATION WRAPPER -->
+    <div id="app-wrapper" class="hidden min-h-screen flex flex-col">
+
+        <!-- Top Navigation Header -->
+        <header class="glass-panel sticky top-0 z-40 no-print border-b border-slate-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16 gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-gradient-to-tr from-brand-600 to-indigo-400 p-2.5 rounded-xl text-white shadow-glow flex items-center justify-center">
+                            <i class="fa-solid fa-graduation-cap text-lg"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg font-extrabold tracking-tight text-white">TNVS<span class="text-indigo-400">Adviser</span></span>
+                                <span class="text-[10px] uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30 font-bold">Adviser Suite</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 hidden sm:block">Grades, Report Cards & Lesson Plans</p>
+                        </div>
+                    </div>
+
+                    <!-- Global Section Selector -->
+                    <div class="flex items-center bg-slate-800/80 rounded-xl px-3 py-1.5 border border-slate-700/80 text-xs sm:text-sm shadow-inner">
+                        <i class="fa-solid fa-shapes text-indigo-400 mr-2 text-xs"></i>
+                        <span class="hidden md:inline text-slate-400 mr-2 font-medium text-xs">Active Filter:</span>
+                        <select id="global-section-select" onchange="handleGlobalSectionChange(this.value)" class="bg-transparent font-bold text-white focus:outline-none cursor-pointer">
+                            <!-- Dynamic 10 Sections -->
+                        </select>
+                    </div>
+
+                    <!-- Navigation Tabs -->
+                    <nav class="hidden lg:flex items-center bg-slate-800/50 p-1 rounded-xl border border-slate-700/50 space-x-1">
+                        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-white bg-brand-600 shadow-sm">
+                            <i class="fa-solid fa-chart-pie mr-1"></i> Dashboard
+                        </button>
+                        <button onclick="switchTab('sections')" id="nav-sections" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                            <i class="fa-solid fa-layer-group mr-1"></i> Sections
+                        </button>
+                        <button onclick="switchTab('students')" id="nav-students" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                            <i class="fa-solid fa-user-graduate mr-1"></i> Gradebook
+                        </button>
+                        <button onclick="switchTab('lessons')" id="nav-lessons" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                            <i class="fa-solid fa-book-open mr-1"></i> Lesson Plans
+                        </button>
+                        <button onclick="switchTab('exams')" id="nav-exams" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                            <i class="fa-solid fa-file-signature mr-1"></i> Exams
+                        </button>
+                        <button onclick="switchTab('checker')" id="nav-checker" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-300 hover:text-white hover:bg-slate-700/50">
+                            <i class="fa-solid fa-qrcode mr-1"></i> Auto-Checker
+                        </button>
+                    </nav>
+
+                    <!-- User Actions -->
+                    <div class="flex items-center space-x-2">
+                        <button onclick="openProfileModal()" class="flex items-center space-x-2 bg-slate-800/80 hover:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-700/80 transition">
+                            <div class="w-6 h-6 rounded-full bg-indigo-500 text-white font-black text-[10px] flex items-center justify-center uppercase" id="user-avatar-badge">A</div>
+                            <span id="user-display-name" class="text-xs font-bold text-slate-200 hidden md:inline">Prof. Admin</span>
+                        </button>
+                        <button onclick="handleLogout()" title="Logout" class="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 px-3 py-2 rounded-xl border border-rose-500/30 transition">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+            <!-- VIEW 1: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-content space-y-6">
+                <div class="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <span id="dash-active-section-banner" class="text-xs font-extrabold uppercase tracking-wider text-indigo-400">Active Filter: All 10 Sections</span>
+                        <h2 class="text-xl font-black text-white mt-0.5">Overview & Class Performance</h2>
+                    </div>
+                    <span class="text-xs font-extrabold bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl">
+                        <i class="fa-solid fa-layer-group mr-1.5"></i> <span id="dash-section-count-badge">10</span> Active Sections
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="glass-card p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase text-slate-400">Class Avg</p>
+                            <h3 id="stat-class-avg" class="text-3xl font-black text-white">0%</h3>
+                            <p id="stat-avg-status" class="text-xs font-bold text-emerald-400 pt-1">--</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-xl"><i class="fa-solid fa-calculator"></i></div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase text-slate-400">Passing Rate</p>
+                            <h3 id="stat-pass-rate" class="text-3xl font-black text-white">0%</h3>
+                            <p class="text-xs text-slate-400 pt-1"><span id="stat-passed-count" class="font-extrabold text-emerald-400">0</span> / <span id="stat-total-students-pass">0</span> Passed</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xl"><i class="fa-solid fa-user-check"></i></div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase text-slate-400">Top Score</p>
+                            <h3 id="stat-highest-grade" class="text-3xl font-black text-white">0%</h3>
+                            <p id="stat-highest-student" class="text-xs font-semibold text-brand-300 truncate max-w-[130px]">N/A</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 text-xl"><i class="fa-solid fa-trophy"></i></div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase text-slate-400">Total Enrolled</p>
+                            <h3 id="stat-total-students-count" class="text-3xl font-black text-white">0</h3>
+                            <p class="text-xs text-slate-400 pt-1">Across Active Filter</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-violet-400 text-xl"><i class="fa-solid fa-users"></i></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+                        <h3 class="font-bold text-white text-base flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-brand-400"></i> Section Performance Benchmarks
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="sectionComparisonChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+                        <h3 class="font-bold text-white text-base flex items-center justify-between">
+                            <span><i class="fa-solid fa-shapes text-violet-400 mr-2"></i>Sections List</span>
+                            <button onclick="switchTab('sections')" class="text-xs font-bold text-brand-400 hover:underline">Manage &rarr;</button>
+                        </h3>
+                        <div id="dash-section-list" class="space-y-2.5 max-h-64 overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 2: 10 SECTIONS MANAGEMENT -->
+            <section id="tab-sections" class="tab-content space-y-6 hidden">
+                <div class="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Manage 10 Student Sections</h2>
+                        <p class="text-xs text-slate-400">Configure section names and advisory class assignments.</p>
+                    </div>
+                </div>
+                <div id="sections-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </section>
+
+            <!-- VIEW 3: GRADEBOOK & ALL SUBJECTS -->
+            <section id="tab-students" class="tab-content space-y-6 hidden">
+                <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Adviser's Class Gradebook & All Subject Records</h2>
+                            <p class="text-xs text-slate-400">Filtered view for <span id="gradebook-filtered-section-title" class="font-extrabold text-brand-400">All 10 Sections</span></p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openAddStudentModal()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow cursor-pointer">
+                                <i class="fa-solid fa-user-plus mr-1.5"></i> Add Student
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3 pt-3 border-t border-slate-800">
+                        <div class="relative flex-grow">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+                            <input type="text" id="student-search-input" onkeyup="renderGradebookTable()" placeholder="Search by name or LRN ID..." class="w-full glass-input pl-9 pr-4 py-2 rounded-xl text-xs font-semibold">
+                        </div>
+                        <select id="section-filter-select" onchange="handleGradebookSectionFilter(this.value)" class="glass-input text-xs font-extrabold rounded-xl px-3 py-2 cursor-pointer"></select>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-950/90 text-slate-400 font-extrabold uppercase text-[10px] border-b border-slate-800">
+                                <tr>
+                                    <th class="p-4">LRN / ID</th>
+                                    <th class="p-4">Student Name</th>
+                                    <th class="p-4 text-center">Section</th>
+                                    <th class="p-4 text-center bg-slate-900/40">General Average</th>
+                                    <th class="p-4 text-center">Honors Eligibility</th>
+                                    <th class="p-4 text-center">Status</th>
+                                    <th class="p-4 text-center">Adviser Grades</th>
+                                    <th class="p-4 text-center">Report Card</th>
+                                    <th class="p-4 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gradebook-tbody" class="divide-y divide-slate-800/60 font-medium"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 4: LESSON PLANS -->
+            <section id="tab-lessons" class="tab-content space-y-6 hidden">
+                <div class="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-book-open text-indigo-400 mr-2"></i> Adviser Lesson Plans & Daily Logs</h2>
+                        <p class="text-xs text-slate-400">Create, manage, and print daily lesson plans (DLL / DLP) for all subjects.</p>
+                    </div>
+                    <button onclick="openLessonPlanModal()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow cursor-pointer flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> New Lesson Plan
+                    </button>
+                </div>
+
+                <div id="lesson-plans-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </section>
+
+            <!-- VIEW 5: EXAMS -->
+            <section id="tab-exams" class="tab-content space-y-6 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-base font-bold text-white">Exam Repository</h3>
+                            <button onclick="openCreateExamModal()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow cursor-pointer">
+                                <i class="fa-solid fa-plus"></i> New Exam
+                            </button>
+                        </div>
+                        <div id="exam-list-container" class="space-y-2.5 max-h-[500px] overflow-y-auto pr-1"></div>
+                    </div>
+
+                    <div class="lg:col-span-2 glass-panel p-6 rounded-2xl border border-slate-800 space-y-6">
+                        <div id="exam-editor-header" class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+                            <div>
+                                <span class="text-[10px] uppercase font-extrabold tracking-wider text-brand-400">Answer Key Inspector</span>
+                                <h2 id="current-exam-title" class="text-xl font-extrabold text-white">Quarterly Science Assessment</h2>
+                                <p id="current-exam-subtitle" class="text-xs text-slate-400">10 Questions | Max Score: 10 pts</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="deleteCurrentExam()" title="Delete Exam" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold px-3.5 py-2 rounded-xl border border-rose-500/30 cursor-pointer">
+                                    <i class="fa-solid fa-trash-can"></i> Delete Exam
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-xs font-bold text-slate-400 mr-1">Modify Qs:</span>
+                                <button onclick="adjustCurrentExamQuestions(-5)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded font-mono font-bold">-5</button>
+                                <button onclick="adjustCurrentExamQuestions(-1)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-2.5 py-1 rounded font-mono font-bold">-1</button>
+                                <button onclick="adjustCurrentExamQuestions(1)" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs px-2.5 py-1 rounded font-mono font-bold">+1</button>
+                                <button onclick="adjustCurrentExamQuestions(5)" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 text-xs px-2.5 py-1 rounded font-mono font-bold">+5</button>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="quickFillExamKeys('A')" class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded font-bold">Fill All A</button>
+                                <button onclick="randomizeExamKeys()" class="text-[11px] bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-500/30 px-2 py-1 rounded font-bold">Randomize</button>
+                            </div>
+                        </div>
+
+                        <div id="answer-keys-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 6: OMR AUTO-CHECKER -->
+            <section id="tab-checker" class="tab-content space-y-6 hidden">
+                <div class="glass-panel p-6 rounded-2xl border border-slate-800">
+                    <h2 class="text-xl font-bold text-white mb-1">OMR Bubble Sheet Auto-Checker</h2>
+                    <p class="text-xs text-slate-400">Select an exam, scan or pick student bubbles, and automatically calculate scores & item accuracy.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="glass-panel p-5 rounded-2xl border border-slate-800 space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Target Exam</label>
+                            <select id="checker-exam-select" onchange="renderCheckerGrid()" class="w-full glass-input p-2.5 rounded-xl text-xs font-bold cursor-pointer"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Select Student</label>
+                            <select id="checker-student-select" onchange="loadStudentCheckerAnswers()" class="w-full glass-input p-2.5 rounded-xl text-xs font-bold cursor-pointer"></select>
+                        </div>
+                        <div class="pt-2">
+                            <button onclick="simulateCameraScan()" class="w-full bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-extrabold py-3 rounded-xl shadow-lg text-xs flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-camera"></i>
+                                <span>Simulate Camera OMR Scan</span>
+                            </button>
+                        </div>
+                        <div id="checker-score-card" class="hidden bg-indigo-950/40 border border-indigo-500/30 p-4 rounded-xl text-center space-y-1">
+                            <span class="text-[10px] font-extrabold uppercase text-indigo-400 tracking-wider">Calculated Score</span>
+                            <div id="checker-score-text" class="text-3xl font-black text-white">0 / 0</div>
+                            <p id="checker-percentage-text" class="text-xs font-bold text-emerald-400">0% Grade Equivalent</p>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                            <h3 class="text-sm font-extrabold text-white">Student Answer Sheet Input</h3>
+                            <button onclick="clearCheckerStudentAnswers()" class="text-xs text-rose-400 hover:text-rose-300 font-bold">Clear Input</button>
+                        </div>
+                        <div id="checker-bubbles-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[420px] overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL 1: LESSON PLAN EDITOR & PRINTABLE VIEW MODAL -->
+    <div id="modal-lesson-plan" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800 no-print">
+                <h3 id="lp-modal-title" class="text-base font-extrabold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-book-bookmark text-indigo-400"></i> Lesson Plan / DLL
+                </h3>
+                <div class="flex items-center gap-2">
+                    <button onclick="printCurrentLessonPlan()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-print"></i> Print for Principal
+                    </button>
+                    <button onclick="closeModal('modal-lesson-plan')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div id="lesson-form-container" class="space-y-3">
+                <input type="hidden" id="lp-id">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Subject Area</label>
+                        <select id="lp-subject" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Section</label>
+                        <select id="lp-section" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer"></select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Lesson Title / Topic</label>
+                    <input type="text" id="lp-title" placeholder="e.g., Ecosystems & Energy Flow" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Quarter & Week</label>
+                        <input type="text" id="lp-quarter" placeholder="e.g., Quarter 2, Week 3" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Date</label>
+                        <input type="date" id="lp-date" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">I. Objectives & Learning Competencies</label>
+                    <textarea id="lp-objectives" rows="2" placeholder="List specific learning objectives..." class="w-full glass-input p-3 rounded-xl text-xs font-semibold"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">II. Learning Resources & References</label>
+                    <input type="text" id="lp-resources" placeholder="e.g., Learner's Module pp. 45-52" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">III. Procedures (Review, Activity, Analysis, Abstraction)</label>
+                    <textarea id="lp-procedures" rows="3" placeholder="Describe classroom activities..." class="w-full glass-input p-3 rounded-xl text-xs font-semibold"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">IV. Remarks & Reflection</label>
+                    <input type="text" id="lp-remarks" placeholder="e.g., 90% mastery achieved." class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                    <button onclick="closeModal('modal-lesson-plan')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                    <button onclick="saveLessonPlan()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-extrabold shadow">Save Lesson Plan</button>
+                </div>
+            </div>
+
+            <div id="printable-lesson-doc" class="hidden bg-white text-slate-900 p-8 rounded-2xl space-y-6 font-sans text-xs print-only">
+                <div class="text-center space-y-1 border-b pb-4">
+                    <p class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Republic of the Philippines • Department of Education</p>
+                    <h2 class="text-xl font-black text-indigo-950 tracking-tight">DAILY LESSON PLAN (DLP) / LOG SUBMISSION</h2>
+                    <p class="text-xs font-semibold text-slate-600">School Year 2025–2026</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">Learning Area (Subject)</span><strong id="print-lp-subject" class="text-sm font-black text-indigo-900">Science</strong></div>
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">Grade & Section</span><strong id="print-lp-section" class="text-sm font-bold text-slate-800">Section 1 - Newton</strong></div>
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">Quarter / Week</span><strong id="print-lp-quarter" class="text-xs font-bold text-slate-800">Quarter 2, Week 1</strong></div>
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">Date of Execution</span><strong id="print-lp-date" class="text-xs font-bold text-slate-800">2026-11-03</strong></div>
+                </div>
+
+                <div class="space-y-4 pt-2">
+                    <div>
+                        <h4 class="font-extrabold text-indigo-950 uppercase text-[11px] border-b pb-1">I. Lesson Title & Topic</h4>
+                        <p id="print-lp-title" class="font-bold text-slate-800 mt-1">Ecosystems & Energy Flow</p>
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-indigo-950 uppercase text-[11px] border-b pb-1">II. Objectives & Competencies</h4>
+                        <p id="print-lp-objectives" class="text-slate-800 mt-1 whitespace-pre-wrap">Illustrate energy flow through trophic levels in an ecosystem.</p>
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-indigo-950 uppercase text-[11px] border-b pb-1">III. Learning Resources & References</h4>
+                        <p id="print-lp-resources" class="text-slate-800 mt-1">Science 10 Learner Module pp. 112-125</p>
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-indigo-950 uppercase text-[11px] border-b pb-1">IV. Procedures & Instructional Steps</h4>
+                        <p id="print-lp-procedures" class="text-slate-800 mt-1 whitespace-pre-wrap">1. Review food chains...</p>
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-indigo-950 uppercase text-[11px] border-b pb-1">V. Remarks & Teacher Reflection</h4>
+                        <p id="print-lp-remarks" class="text-slate-800 mt-1">92% mastery achieved.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-8 pt-10 border-t border-slate-300 text-center">
+                    <div>
+                        <div class="border-b border-slate-800 w-3/4 mx-auto mb-1"></div>
+                        <p class="text-[10px] font-bold text-slate-600">Prepared by: Class Adviser</p>
+                    </div>
+                    <div>
+                        <div class="border-b border-slate-800 w-3/4 mx-auto mb-1"></div>
+                        <p class="text-[10px] font-bold text-slate-600">Approved by: School Principal</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADVISER MULTI-SUBJECT GRADE ENTRY MODAL -->
+    <div id="modal-adviser-grades" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase text-indigo-400">Adviser Grade Input Portal</span>
+                    <h3 id="adviser-modal-student-title" class="text-lg font-extrabold text-white">Edit Grades for Student</h3>
+                </div>
+                <button onclick="closeModal('modal-adviser-grades')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse border border-slate-800">
+                    <thead>
+                        <tr class="bg-slate-950 text-slate-400 font-extrabold uppercase text-[10px] border-b border-slate-800">
+                            <th class="p-3 border border-slate-800">Subject Learning Area</th>
+                            <th class="p-3 border border-slate-800 text-center">Q1</th>
+                            <th class="p-3 border border-slate-800 text-center">Q2</th>
+                            <th class="p-3 border border-slate-800 text-center">Q3</th>
+                            <th class="p-3 border border-slate-800 text-center">Q4</th>
+                            <th class="p-3 border border-slate-800 text-center bg-slate-900">Subject Final</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adviser-subjects-tbody" class="divide-y divide-slate-800 font-medium"></tbody>
+                </table>
+            </div>
+
+            <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button onclick="closeModal('modal-adviser-grades')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                <button onclick="saveAdviserGrades()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-xl text-xs font-extrabold shadow">Save All Grades</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: REPORT CARD MODAL -->
+    <div id="modal-report-card" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-address-card text-indigo-400"></i> Student Official Report Card
+                </h3>
+                <button onclick="closeModal('modal-report-card')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div id="report-card-print-area" class="bg-white text-slate-900 p-8 rounded-2xl space-y-6 font-sans text-xs">
+                <div class="text-center space-y-1 border-b pb-4">
+                    <p class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Republic of the Philippines • Department of Education</p>
+                    <h2 class="text-xl font-black text-indigo-950 tracking-tight">OFFICIAL STUDENT PROGRESS REPORT CARD</h2>
+                    <p class="text-xs font-semibold text-slate-600">School Year 2025–2026</p>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">Student Name</span><strong id="rc-student-name" class="text-sm font-black text-slate-900">Juan Dela Cruz</strong></div>
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">LRN Number</span><strong id="rc-student-lrn" class="text-sm font-mono font-bold text-slate-800">100000000001</strong></div>
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">Section</span><strong id="rc-student-section" class="text-sm font-bold text-indigo-700">Section 1 - Newton</strong></div>
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">Grade Level</span><strong class="text-xs font-bold text-slate-800">Grade 10</strong></div>
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">General Average</span><strong id="rc-general-avg" class="text-sm font-black text-emerald-700">88.5%</strong></div>
+                    <div><span class="text-[10px] text-slate-500 font-bold uppercase block">Academic Status</span><strong id="rc-academic-status" class="text-xs font-extrabold uppercase text-emerald-600">Passed (With Honors)</strong></div>
+                </div>
+
+                <div>
+                    <h4 class="font-extrabold text-slate-800 mb-2 uppercase text-[11px] tracking-wider">Learning Areas & Quarterly Performance</h4>
+                    <table class="w-full text-left border-collapse border border-slate-300">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 font-bold text-[10px] uppercase">
+                                <th class="p-2.5 border border-slate-300">Subjects</th>
+                                <th class="p-2.5 border border-slate-300 text-center">Q1</th>
+                                <th class="p-2.5 border border-slate-300 text-center">Q2</th>
+                                <th class="p-2.5 border border-slate-300 text-center">Q3</th>
+                                <th class="p-2.5 border border-slate-300 text-center">Q4</th>
+                                <th class="p-2.5 border border-slate-300 text-center">Final Rating</th>
+                                <th class="p-2.5 border border-slate-300 text-center">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rc-subjects-tbody" class="divide-y divide-slate-200 font-medium"></tbody>
+                    </table>
+                </div>
+
+                <div class="grid grid-cols-2 gap-8 pt-6 border-t border-slate-300 text-center">
+                    <div>
+                        <div class="border-b border-slate-800 w-3/4 mx-auto mb-1"></div>
+                        <p class="text-[10px] font-bold text-slate-600">Class Adviser Signature</p>
+                    </div>
+                    <div>
+                        <div class="border-b border-slate-800 w-3/4 mx-auto mb-1"></div>
+                        <p class="text-[10px] font-bold text-slate-600">School Principal Signature</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end space-x-2 pt-2">
+                <button onclick="closeModal('modal-report-card')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Close</button>
+                <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-extrabold shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-print"></i> Print Official Report Card
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: ADD STUDENT MODAL -->
+    <div id="modal-add-student" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-user-plus text-indigo-400"></i> Add New Student
+                </h3>
+                <button onclick="closeModal('modal-add-student')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Full Name</label>
+                    <input type="text" id="add-stu-name" placeholder="e.g., Juan Dela Cruz" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">LRN / ID Number</label>
+                    <input type="text" id="add-stu-lrn" placeholder="e.g., 100000000999" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Section</label>
+                    <select id="add-stu-section" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer"></select>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button onclick="closeModal('modal-add-student')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                <button onclick="saveNewStudent()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-extrabold shadow">Save Student</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: EXAM CREATION MODAL -->
+    <div id="modal-create-exam" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-file-circle-plus text-indigo-400"></i> Create Assessment
+                </h3>
+                <button onclick="closeModal('modal-create-exam')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Exam Title</label>
+                    <input type="text" id="new-exam-title" placeholder="e.g., Midterm Physics Exam" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Subject / Category</label>
+                    <input type="text" id="new-exam-subject" placeholder="e.g., Science" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase mb-1">Total Questions</label>
+                    <input type="number" id="new-exam-qcount" min="1" max="100" value="20" class="w-full glass-input px-3 py-2 rounded-xl text-xs font-bold">
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-3 border-t border-slate-800">
+                <button onclick="closeModal('modal-create-exam')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white">Cancel</button>
+                <button onclick="saveNewExam()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-xl text-xs font-extrabold shadow">Create Exam</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APPLICATION CORE -->
+    <script>
+        const CORE_SUBJECTS = ['Mathematics', 'Science', 'English', 'Filipino', 'Araling Panlipunan', 'MAPEH', 'ESP', 'TLE'];
+
+        let appState = {
+            currentUser: { username: 'admin', name: 'Prof. Admin', role: 'admin' },
+            sections: [
+                { id: 'SEC1', name: 'Section 1 - Newton', gradeLevel: 'Grade 10' },
+                { id: 'SEC2', name: 'Section 2 - Einstein', gradeLevel: 'Grade 10' },
+                { id: 'SEC3', name: 'Section 3 - Galileo', gradeLevel: 'Grade 10' },
+                { id: 'SEC4', name: 'Section 4 - Curie', gradeLevel: 'Grade 10' },
+                { id: 'SEC5', name: 'Section 5 - Tesla', gradeLevel: 'Grade 10' },
+                { id: 'SEC6', name: 'Section 6 - Darwin', gradeLevel: 'Grade 10' },
+                { id: 'SEC7', name: 'Section 7 - Hawking', gradeLevel: 'Grade 10' },
+                { id: 'SEC8', name: 'Section 8 - Pasteur', gradeLevel: 'Grade 10' },
+                { id: 'SEC9', name: 'Section 9 - Faraday', gradeLevel: 'Grade 10' },
+                { id: 'SEC10', name: 'Section 10 - Mendel', gradeLevel: 'Grade 10' }
+            ],
+            activeSectionFilter: 'ALL',
+            activeTab: 'dashboard',
+            currentExamId: 'EX1',
+            exams: [
+                {
+                    id: 'EX1',
+                    title: 'Quarterly Science Assessment',
+                    subject: 'Science',
+                    questionCount: 10,
+                    keys: ['A', 'B', 'C', 'D', 'A', 'B', 'C', 'D', 'A', 'B']
+                }
+            ],
+            students: [],
+            lessonPlans: [
+                {
+                    id: 'LP1',
+                    subject: 'Science',
+                    sectionId: 'SEC1',
+                    title: 'Ecosystems & Energy Flow',
+                    quarter: 'Quarter 2, Week 1',
+                    date: '2026-11-03',
+                    objectives: 'Illustrate energy flow through trophic levels in an ecosystem.',
+                    resources: 'Science 10 Learner Module pp. 112-125, PowerPoint slides',
+                    procedures: '1. Review food chains\n2. Interactive energy pyramid activity\n3. Group discussion on ecological efficiency',
+                    remarks: 'Students demonstrated active participation. 92% mastery achieved.'
+                }
+            ],
+            checkerAnswers: {},
+            editingStudentId: null,
+            editingLessonId: null
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            generateSampleStudents();
+            renderGlobalSectionSelector();
+            renderDashboard();
+        });
+
+        function generateSampleStudents() {
+            const sampleNames = [
+                'Juan Dela Cruz', 'Maria Clara', 'Jose Rizal', 'Andres Bonifacio', 'Apolinario Mabini',
+                'Emilio Aguinaldo', 'Melchora Aquino', 'Gabriela Silang', 'Antonio Luna', 'Marcelo Del Pilar'
+            ];
+            appState.students = [];
+            let lrnCounter = 100000000001;
+
+            appState.sections.forEach((sec) => {
+                sampleNames.forEach((name, nIdx) => {
+                    const subjectGrades = {};
+                    CORE_SUBJECTS.forEach(sub => {
+                        subjectGrades[sub] = {
+                            q1: Math.floor(Math.random() * 12) + 84,
+                            q2: Math.floor(Math.random() * 12) + 84,
+                            q3: Math.floor(Math.random() * 12) + 84,
+                            q4: Math.floor(Math.random() * 12) + 84
+                        };
+                    });
+
+                    appState.students.push({
+                        id: `STU_${sec.id}_${nIdx}`,
+                        lrn: String(lrnCounter++),
+                        name: name,
+                        sectionId: sec.id,
+                        subjects: subjectGrades
+                    });
+                });
+            });
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('login-username').value.trim();
+            const p = document.getElementById('login-password').value;
+
+            if (u === 'admin' && p === 'admin123') {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app-wrapper').classList.remove('hidden');
+                showToast('Welcome back, Adviser!');
+                renderDashboard();
+            } else {
+                document.getElementById('login-error-alert').classList.remove('hidden');
+            }
+        }
+
+        function fillAndLoginDefault() {
+            document.getElementById('login-username').value = 'admin';
+            document.getElementById('login-password').value = 'admin123';
+            document.getElementById('login-form').dispatchEvent(new Event('submit'));
+        }
+
+        function handleLogout() {
+            document.getElementById('app-wrapper').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+            showToast('Logged out successfully');
+        }
+
+        function togglePasswordVisibility(inputId, iconId) {
+            const inp = document.getElementById(inputId);
+            const ico = document.getElementById(iconId);
+            if (inp.type === 'password') {
+                inp.type = 'text';
+                ico.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                inp.type = 'password';
+                ico.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        function switchTab(tabId) {
+            appState.activeTab = tabId;
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-600', 'text-white');
+                btn.classList.add('text-slate-300');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-brand-600', 'text-white');
+                activeNav.classList.remove('text-slate-300');
+            }
+
+            if (tabId === 'dashboard') renderDashboard();
+            if (tabId === 'sections') renderSectionsTab();
+            if (tabId === 'students') renderGradebookTable();
+            if (tabId === 'lessons') renderLessonPlansTab();
+            if (tabId === 'exams') renderExamsTab();
+            if (tabId === 'checker') renderCheckerTab();
+        }
+
+        function renderGlobalSectionSelector() {
+            const select = document.getElementById('global-section-select');
+            const gradebookSelect = document.getElementById('section-filter-select');
+            
+            let html = `<option value="ALL">All 10 Sections</option>`;
+            appState.sections.forEach(s => {
+                html += `<option value="${s.id}">${s.name}</option>`;
+            });
+
+            select.innerHTML = html;
+            gradebookSelect.innerHTML = html;
+        }
+
+        function handleGlobalSectionChange(secId) {
+            appState.activeSectionFilter = secId;
+            document.getElementById('section-filter-select').value = secId;
+            showToast(`Filter changed to: ${secId === 'ALL' ? 'All 10 Sections' : secId}`);
+            renderDashboard();
+            if (appState.activeTab === 'students') renderGradebookTable();
+        }
+
+        function handleGradebookSectionFilter(secId) {
+            appState.activeSectionFilter = secId;
+            document.getElementById('global-section-select').value = secId;
+            renderGradebookTable();
+        }
+
+        function calculateStudentGeneralAvg(student) {
+            let total = 0;
+            CORE_SUBJECTS.forEach(sub => {
+                const s = student.subjects[sub];
+                const subFinal = (s.q1 + s.q2 + s.q3 + s.q4) / 4;
+                total += subFinal;
+            });
+            return (total / CORE_SUBJECTS.length).toFixed(1);
+        }
+
+        function getHonorsEligibility(genAvg) {
+            if (genAvg >= 98) return 'With Highest Honors';
+            if (genAvg >= 95) return 'With High Honors';
+            if (genAvg >= 90) return 'With Honors';
+            return 'Standard';
+        }
+
+        function renderDashboard() {
+            const filteredStudents = appState.activeSectionFilter === 'ALL' 
+                ? appState.students 
+                : appState.students.filter(s => s.sectionId === appState.activeSectionFilter);
+
+            const totalCount = filteredStudents.length;
+            document.getElementById('stat-total-students-count').textContent = totalCount;
+            document.getElementById('stat-total-students-pass').textContent = totalCount;
+
+            if (totalCount === 0) {
+                document.getElementById('stat-class-avg').textContent = '0%';
+                document.getElementById('stat-pass-rate').textContent = '0%';
+                return;
+            }
+
+            let totalGrades = 0;
+            let passedCount = 0;
+            let highestGrade = -1;
+            let highestStudent = 'N/A';
+
+            filteredStudents.forEach(s => {
+                const finalGrade = parseFloat(calculateStudentGeneralAvg(s));
+                totalGrades += finalGrade;
+                if (finalGrade >= 75) passedCount++;
+                if (finalGrade > highestGrade) {
+                    highestGrade = finalGrade;
+                    highestStudent = s.name;
+                }
+            });
+
+            const avgGrade = (totalGrades / totalCount).toFixed(1);
+            const passRate = ((passedCount / totalCount) * 100).toFixed(0);
+
+            document.getElementById('stat-class-avg').textContent = `${avgGrade}%`;
+            document.getElementById('stat-avg-status').textContent = avgGrade >= 75 ? 'Satisfactory' : 'Needs Improvement';
+            document.getElementById('stat-pass-rate').textContent = `${passRate}%`;
+            document.getElementById('stat-passed-count').textContent = passedCount;
+            document.getElementById('stat-highest-grade').textContent = `${highestGrade.toFixed(1)}%`;
+            document.getElementById('stat-highest-student').textContent = highestStudent;
+
+            renderDashboardSectionList();
+            renderChart();
+        }
+
+        function renderDashboardSectionList() {
+            const container = document.getElementById('dash-section-list');
+            container.innerHTML = appState.sections.map(sec => {
+                const secStus = appState.students.filter(s => s.sectionId === sec.id);
+                return `
+                    <div class="glass-card p-3 rounded-xl flex items-center justify-between border border-slate-800">
+                        <div>
+                            <p class="text-xs font-bold text-white">${sec.name}</p>
+                            <p class="text-[10px] text-slate-400">${secStus.length} Students</p>
+                        </div>
+                        <span class="text-xs font-extrabold text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20">${sec.id}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        let sectionChartInstance = null;
+        function renderChart() {
+            const ctx = document.getElementById('sectionComparisonChart').getContext('2d');
+            const labels = appState.sections.map(s => s.name.split(' - ')[1] || s.id);
+            const averages = appState.sections.map(sec => {
+                const stus = appState.students.filter(s => s.sectionId === sec.id);
+                if (!stus.length) return 0;
+                const sum = stus.reduce((acc, s) => acc + parseFloat(calculateStudentGeneralAvg(s)), 0);
+                return (sum / stus.length).toFixed(1);
+            });
+
+            if (sectionChartInstance) sectionChartInstance.destroy();
+
+            sectionChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'General Average (%)',
+                        data: averages,
+                        backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                        borderColor: '#6366f1',
+                        borderWidth: 1.5,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 50, max: 100, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderSectionsTab() {
+            const grid = document.getElementById('sections-cards-grid');
+            grid.innerHTML = appState.sections.map(sec => {
+                const count = appState.students.filter(s => s.sectionId === sec.id).length;
+                return `
+                    <div class="glass-card p-5 rounded-2xl border border-slate-800 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-black uppercase text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/30">${sec.id}</span>
+                            <span class="text-xs text-slate-400 font-semibold">${sec.gradeLevel}</span>
+                        </div>
+                        <h3 class="text-base font-extrabold text-white">${sec.name}</h3>
+                        <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800">
+                            <span>Enrolled Students</span>
+                            <span class="font-bold text-white">${count} Students</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderGradebookTable() {
+            const tbody = document.getElementById('gradebook-tbody');
+            const search = document.getElementById('student-search-input').value.toLowerCase();
+            const secFilter = appState.activeSectionFilter;
+
+            let list = appState.students.filter(s => {
+                const matchesSec = secFilter === 'ALL' || s.sectionId === secFilter;
+                const matchesSearch = s.name.toLowerCase().includes(search) || s.lrn.includes(search);
+                return matchesSec && matchesSearch;
+            });
+
+            tbody.innerHTML = list.map(s => {
+                const genAvg = calculateStudentGeneralAvg(s);
+                const passed = genAvg >= 75;
+                const honors = getHonorsEligibility(genAvg);
+
+                return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="p-4 font-mono font-bold text-slate-300">${s.lrn}</td>
+                        <td class="p-4 font-bold text-white">${s.name}</td>
+                        <td class="p-4 text-center"><span class="bg-slate-800 text-indigo-300 px-2 py-0.5 rounded font-extrabold text-[10px] border border-slate-700">${s.sectionId}</span></td>
+                        <td class="p-4 text-center font-black text-brand-300 text-sm">${genAvg}%</td>
+                        <td class="p-4 text-center font-bold text-slate-300 text-[11px]">${honors}</td>
+                        <td class="p-4 text-center">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${passed ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'}">${passed ? 'Passed' : 'Failed'}</span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <button onclick="openAdviserGradesModal('${s.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded-xl font-bold shadow flex items-center gap-1 mx-auto cursor-pointer">
+                                <i class="fa-solid fa-pen-to-square"></i> Input Grades
+                            </button>
+                        </td>
+                        <td class="p-4 text-center">
+                            <button onclick="openReportCardModal('${s.id}')" class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 mx-auto cursor-pointer">
+                                <i class="fa-solid fa-address-card"></i> Card
+                            </button>
+                        </td>
+                        <td class="p-4 text-center">
+                            <button onclick="deleteStudent('${s.id}')" class="text-rose-400 hover:text-rose-300 text-xs cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // LESSON PLANS LOGIC
+        function renderLessonPlansTab() {
+            const grid = document.getElementById('lesson-plans-grid');
+            if (appState.lessonPlans.length === 0) {
+                grid.innerHTML = `<div class="col-span-3 text-center py-12 text-slate-500 text-xs font-semibold">No lesson plans recorded yet. Click "New Lesson Plan" to begin.</div>`;
+                return;
+            }
+
+            grid.innerHTML = appState.lessonPlans.map(lp => {
+                const sec = appState.sections.find(s => s.id === lp.sectionId);
+                return `
+                    <div class="glass-card p-5 rounded-2xl border border-slate-800 space-y-3 flex flex-col justify-between">
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-black uppercase text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/30">${lp.subject}</span>
+                                <span class="text-[11px] font-mono text-slate-400">${lp.date}</span>
+                            </div>
+                            <h3 class="text-base font-extrabold text-white">${lp.title}</h3>
+                            <p class="text-[11px] text-slate-300 font-semibold"><i class="fa-solid fa-shapes text-indigo-400 mr-1"></i> ${sec ? sec.name : lp.sectionId} • <span class="text-brand-300">${lp.quarter}</span></p>
+                            <p class="text-xs text-slate-400 pt-1 line-clamp-2"><strong>Objectives:</strong> ${lp.objectives}</p>
+                        </div>
+                        <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+                            <button onclick="openLessonPlanModal('${lp.id}')" class="text-xs text-indigo-400 hover:text-indigo-300 font-bold"><i class="fa-solid fa-pen-to-square mr-1"></i> Edit & Print</button>
+                            <button onclick="deleteLessonPlan('${lp.id}')" class="text-xs text-rose-400 hover:text-rose-300 font-bold"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openLessonPlanModal(id = null) {
+            appState.editingLessonId = id;
+            const subSelect = document.getElementById('lp-subject');
+            subSelect.innerHTML = CORE_SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join('');
+
+            const secSelect = document.getElementById('lp-section');
+            secSelect.innerHTML = appState.sections.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+            document.getElementById('lesson-form-container').classList.remove('hidden');
+            document.getElementById('printable-lesson-doc').classList.add('hidden');
+
+            if (id) {
+                const lp = appState.lessonPlans.find(l => l.id === id);
+                if (lp) {
+                    document.getElementById('lp-modal-title').innerHTML = `<i class="fa-solid fa-book-bookmark text-indigo-400"></i> Edit Lesson Plan`;
+                    document.getElementById('lp-subject').value = lp.subject;
+                    document.getElementById('lp-section').value = lp.sectionId;
+                    document.getElementById('lp-title').value = lp.title;
+                    document.getElementById('lp-quarter').value = lp.quarter;
+                    document.getElementById('lp-date').value = lp.date;
+                    document.getElementById('lp-objectives').value = lp.objectives;
+                    document.getElementById('lp-resources').value = lp.resources;
+                    document.getElementById('lp-procedures').value = lp.procedures;
+                    document.getElementById('lp-remarks').value = lp.remarks;
+
+                    updatePrintableLessonDoc(lp);
+                }
+            } else {
+                document.getElementById('lp-modal-title').innerHTML = `<i class="fa-solid fa-book-bookmark text-indigo-400"></i> Create Lesson Plan / DLL`;
+                document.getElementById('lp-title').value = '';
+                document.getElementById('lp-quarter').value = 'Quarter 1, Week 1';
+                document.getElementById('lp-date').value = new Date().toISOString().split('T')[0];
+                document.getElementById('lp-objectives').value = '';
+                document.getElementById('lp-resources').value = '';
+                document.getElementById('lp-procedures').value = '';
+                document.getElementById('lp-remarks').value = '';
+            }
+
+            document.getElementById('modal-lesson-plan').classList.remove('hidden');
+        }
+
+        function updatePrintableLessonDoc(lp) {
+            const sec = appState.sections.find(s => s.id === lp.sectionId);
+            document.getElementById('print-lp-subject').textContent = lp.subject;
+            document.getElementById('print-lp-section').textContent = sec ? sec.name : lp.sectionId;
+            document.getElementById('print-lp-quarter').textContent = lp.quarter;
+            document.getElementById('print-lp-date').textContent = lp.date;
+            document.getElementById('print-lp-title').textContent = lp.title;
+            document.getElementById('print-lp-objectives').textContent = lp.objectives;
+            document.getElementById('print-lp-resources').textContent = lp.resources;
+            document.getElementById('print-lp-procedures').textContent = lp.procedures;
+            document.getElementById('print-lp-remarks').textContent = lp.remarks;
+        }
+
+        function printCurrentLessonPlan() {
+            if (appState.editingLessonId) {
+                const lp = appState.lessonPlans.find(l => l.id === appState.editingLessonId);
+                if (lp) updatePrintableLessonDoc(lp);
+            } else {
+                const tempLP = {
+                    subject: document.getElementById('lp-subject').value,
+                    sectionId: document.getElementById('lp-section').value,
+                    title: document.getElementById('lp-title').value || 'Untitled Lesson',
+                    quarter: document.getElementById('lp-quarter').value,
+                    date: document.getElementById('lp-date').value,
+                    objectives: document.getElementById('lp-objectives').value,
+                    resources: document.getElementById('lp-resources').value,
+                    procedures: document.getElementById('lp-procedures').value,
+                    remarks: document.getElementById('lp-remarks').value
+                };
+                updatePrintableLessonDoc(tempLP);
+            }
+
+            document.getElementById('lesson-form-container').classList.add('hidden');
+            document.getElementById('printable-lesson-doc').classList.remove('hidden');
+            window.print();
+            setTimeout(() => {
+                document.getElementById('lesson-form-container').classList.remove('hidden');
+                document.getElementById('printable-lesson-doc').classList.add('hidden');
+            }, 1000);
+        }
+
+        function saveLessonPlan() {
+            const subject = document.getElementById('lp-subject').value;
+            const sectionId = document.getElementById('lp-section').value;
+            const title = document.getElementById('lp-title').value.trim() || 'Untitled Lesson';
+            const quarter = document.getElementById('lp-quarter').value.trim();
+            const date = document.getElementById('lp-date').value;
+            const objectives = document.getElementById('lp-objectives').value.trim();
+            const resources = document.getElementById('lp-resources').value.trim();
+            const procedures = document.getElementById('lp-procedures').value.trim();
+            const remarks = document.getElementById('lp-remarks').value.trim();
+
+            if (appState.editingLessonId) {
+                const lp = appState.lessonPlans.find(l => l.id === appState.editingLessonId);
+                if (lp) {
+                    lp.subject = subject;
+                    lp.sectionId = sectionId;
+                    lp.title = title;
+                    lp.quarter = quarter;
+                    lp.date = date;
+                    lp.objectives = objectives;
+                    lp.resources = resources;
+                    lp.procedures = procedures;
+                    lp.remarks = remarks;
+                }
+                showToast('Lesson plan updated successfully');
+            } else {
+                const newLP = {
+                    id: `LP_${Date.now()}`,
+                    subject, sectionId, title, quarter, date, objectives, resources, procedures, remarks
+                };
+                appState.lessonPlans.unshift(newLP);
+                showToast('Created new lesson plan');
+            }
+
+            closeModal('modal-lesson-plan');
+            renderLessonPlansTab();
+        }
+
+        function deleteLessonPlan(id) {
+            appState.lessonPlans = appState.lessonPlans.filter(l => l.id !== id);
+            renderLessonPlansTab();
+            showToast('Lesson plan deleted');
+        }
+
+        // ADVISER GRADES INPUT MODAL
+        function openAdviserGradesModal(studentId) {
+            appState.editingStudentId = studentId;
+            const student = appState.students.find(s => s.id === studentId);
+            if (!student) return;
+
+            document.getElementById('adviser-modal-student-title').textContent = `Edit Quarterly Grades for ${student.name} (${student.lrn})`;
+
+            const tbody = document.getElementById('adviser-subjects-tbody');
+            tbody.innerHTML = CORE_SUBJECTS.map(sub => {
+                const g = student.subjects[sub] || { q1: 85, q2: 85, q3: 85, q4: 85 };
+                return `
+                    <tr class="border-b border-slate-800">
+                        <td class="p-3 font-bold text-white">${sub}</td>
+                        <td class="p-2 border border-slate-800 text-center"><input type="number" min="50" max="100" id="grade_${sub}_q1" value="${g.q1}" class="w-16 glass-input text-center py-1 rounded font-mono font-bold text-xs"></td>
+                        <td class="p-2 border border-slate-800 text-center"><input type="number" min="50" max="100" id="grade_${sub}_q2" value="${g.q2}" class="w-16 glass-input text-center py-1 rounded font-mono font-bold text-xs"></td>
+                        <td class="p-2 border border-slate-800 text-center"><input type="number" min="50" max="100" id="grade_${sub}_q3" value="${g.q3}" class="w-16 glass-input text-center py-1 rounded font-mono font-bold text-xs"></td>
+                        <td class="p-2 border border-slate-800 text-center"><input type="number" min="50" max="100" id="grade_${sub}_q4" value="${g.q4}" class="w-16 glass-input text-center py-1 rounded font-mono font-bold text-xs"></td>
+                        <td class="p-2 border border-slate-800 text-center font-black text-brand-300 bg-slate-900/60">${((g.q1 + g.q2 + g.q3 + g.q4) / 4).toFixed(1)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('modal-adviser-grades').classList.remove('hidden');
+        }
+
+        function saveAdviserGrades() {
+            const student = appState.students.find(s => s.id === appState.editingStudentId);
+            if (!student) return;
+
+            CORE_SUBJECTS.forEach(sub => {
+                const q1 = parseFloat(document.getElementById(`grade_${sub}_q1`).value) || 0;
+                const q2 = parseFloat(document.getElementById(`grade_${sub}_q2`).value) || 0;
+                const q3 = parseFloat(document.getElementById(`grade_${sub}_q3`).value) || 0;
+                const q4 = parseFloat(document.getElementById(`grade_${sub}_q4`).value) || 0;
+
+                student.subjects[sub] = { q1, q2, q3, q4 };
+            });
+
+            closeModal('modal-adviser-grades');
+            renderGradebookTable();
+            renderDashboard();
+            showToast(`Updated all subject grades for ${student.name}`);
+        }
+
+        function openReportCardModal(studentId) {
+            const student = appState.students.find(s => s.id === studentId);
+            if (!student) return;
+
+            const sec = appState.sections.find(s => s.id === student.sectionId);
+            const genAvg = calculateStudentGeneralAvg(student);
+            const honors = getHonorsEligibility(genAvg);
+
+            document.getElementById('rc-student-name').textContent = student.name;
+            document.getElementById('rc-student-lrn').textContent = student.lrn;
+            document.getElementById('rc-student-section').textContent = sec ? sec.name : student.sectionId;
+            document.getElementById('rc-general-avg').textContent = `${genAvg}%`;
+            document.getElementById('rc-academic-status').textContent = genAvg >= 75 ? `Passed (${honors})` : 'Needs Improvement';
+
+            const tbody = document.getElementById('rc-subjects-tbody');
+            tbody.innerHTML = CORE_SUBJECTS.map(sub => {
+                const s = student.subjects[sub];
+                const finalRating = ((s.q1 + s.q2 + s.q3 + s.q4) / 4).toFixed(1);
+                const passed = finalRating >= 75;
+
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-2.5 border border-slate-300 font-bold text-slate-900">${sub}</td>
+                        <td class="p-2.5 border border-slate-300 text-center font-mono">${s.q1}</td>
+                        <td class="p-2.5 border border-slate-300 text-center font-mono">${s.q2}</td>
+                        <td class="p-2.5 border border-slate-300 text-center font-mono">${s.q3}</td>
+                        <td class="p-2.5 border border-slate-300 text-center font-mono">${s.q4}</td>
+                        <td class="p-2.5 border border-slate-300 text-center font-black text-slate-900">${finalRating}</td>
+                        <td class="p-2.5 border border-slate-300 text-center font-extrabold uppercase ${passed ? 'text-emerald-700' : 'text-rose-700'}">${passed ? 'Passed' : 'Failed'}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('modal-report-card').classList.remove('hidden');
+        }
+
+        function openAddStudentModal() {
+            const select = document.getElementById('add-stu-section');
+            select.innerHTML = appState.sections.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            if (appState.activeSectionFilter !== 'ALL') {
+                select.value = appState.activeSectionFilter;
+            }
+            document.getElementById('add-stu-name').value = '';
+            document.getElementById('add-stu-lrn').value = Math.floor(100000000000 + Math.random() * 900000000000);
+            document.getElementById('modal-add-student').classList.remove('hidden');
+        }
+
+        function saveNewStudent() {
+            const name = document.getElementById('add-stu-name').value.trim();
+            const lrn = document.getElementById('add-stu-lrn').value.trim();
+            const sectionId = document.getElementById('add-stu-section').value;
+
+            if (!name) {
+                showToast('Please enter student name');
+                return;
+            }
+
+            const subjectGrades = {};
+            CORE_SUBJECTS.forEach(sub => {
+                subjectGrades[sub] = { q1: 85, q2: 85, q3: 85, q4: 85 };
+            });
+
+            const newStu = {
+                id: `STU_${Date.now()}`,
+                lrn: lrn || String(Math.floor(100000000000 + Math.random() * 900000000000)),
+                name: name,
+                sectionId: sectionId,
+                subjects: subjectGrades
+            };
+
+            appState.students.unshift(newStu);
+            closeModal('modal-add-student');
+            renderGradebookTable();
+            renderDashboard();
+            showToast(`Added student: ${name}`);
+        }
+
+        function deleteStudent(id) {
+            appState.students = appState.students.filter(s => s.id !== id);
+            renderGradebookTable();
+            renderDashboard();
+            showToast('Student removed');
+        }
+
+        function renderExamsTab() {
+            renderExamList();
+            renderAnswerKeysGrid();
+        }
+
+        function renderExamList() {
+            const container = document.getElementById('exam-list-container');
+            if (appState.exams.length === 0) {
+                container.innerHTML = `<div class="text-center py-8 text-slate-500"><p class="text-xs">No assessments available</p></div>`;
+                return;
+            }
+
+            container.innerHTML = appState.exams.map(ex => `
+                <div onclick="selectExam('${ex.id}')" class="p-3.5 rounded-xl border cursor-pointer transition ${ex.id === appState.currentExamId ? 'bg-indigo-950/60 border-indigo-500/50 shadow-md' : 'glass-card border-slate-800 hover:border-slate-700'}">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[10px] font-extrabold uppercase text-indigo-400">${ex.subject}</span>
+                        <span class="text-[10px] font-mono bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">${ex.questionCount} Qs</span>
+                    </div>
+                    <h4 class="text-xs font-bold text-white">${ex.title}</h4>
+                </div>
+            `).join('');
+        }
+
+        function selectExam(examId) {
+            appState.currentExamId = examId;
+            renderExamsTab();
+        }
+
+        function renderAnswerKeysGrid() {
+            const current = appState.exams.find(e => e.id === appState.currentExamId);
+            const grid = document.getElementById('answer-keys-grid');
+
+            if (!current) {
+                document.getElementById('current-exam-title').textContent = 'No Exam Selected';
+                document.getElementById('current-exam-subtitle').textContent = 'Please select or create an assessment';
+                grid.innerHTML = '<div class="col-span-2 text-center py-10 text-slate-500 text-xs font-semibold">No answer keys to display.</div>';
+                return;
+            }
+
+            document.getElementById('current-exam-title').textContent = current.title;
+            document.getElementById('current-exam-subtitle').textContent = `${current.questionCount} Questions | Max Score: ${current.questionCount} pts`;
+
+            const options = ['A', 'B', 'C', 'D', 'E'];
+
+            grid.innerHTML = current.keys.map((key, qIdx) => `
+                <div class="glass-card p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span class="text-xs font-mono font-extrabold text-slate-400 w-8">Q${qIdx + 1}</span>
+                    <div class="flex items-center space-x-1.5">
+                        ${options.map(opt => `
+                            <button onclick="setExamKey(${qIdx}, '${opt}')" class="bubble ${key === opt ? 'bubble-selected' : ''}">${opt}</button>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setExamKey(qIdx, option) {
+            const current = appState.exams.find(e => e.id === appState.currentExamId);
+            if (current) {
+                current.keys[qIdx] = option;
+                renderAnswerKeysGrid();
+            }
+        }
+
+        function adjustCurrentExamQuestions(amount) {
+            const current = appState.exams.find(e => e.id === appState.currentExamId);
+            if (!current) return;
+
+            let newCount = current.questionCount + amount;
+            if (newCount < 1) newCount = 1;
+            if (newCount > 100) newCount = 100;
+
+            current.questionCount = newCount;
+            while (current.keys.length < newCount) current.keys.push('A');
+            current.keys = current.keys.slice(0, newCount);
+
+            renderExamsTab();
+            showToast(`Exam questions updated to ${newCount}`);
+        }
+
+        function quickFillExamKeys(option) {
+            const current = appState.exams.find(e => e.id === appState.currentExamId);
+            if (current) {
+                current.keys = current.keys.map(() => option);
+                renderAnswerKeysGrid();
+            }
+        }
+
+        function randomizeExamKeys() {
+            const current = appState.exams.find(e => e.id === appState.currentExamId);
+            const opts = ['A', 'B', 'C', 'D'];
+            if (current) {
+                current.keys = current.keys.map(() => opts[Math.floor(Math.random() * opts.length)]);
+                renderAnswerKeysGrid();
+            }
+        }
+
+        function deleteCurrentExam() {
+            const currentExam = appState.exams.find(e => e.id === appState.currentExamId);
+            if (!currentExam) {
+                showToast('No exam selected to delete');
+                return;
+            }
+
+            if (confirm(`Are you sure you want to delete "${currentExam.title}"?`)) {
+                appState.exams = appState.exams.filter(e => e.id !== appState.currentExamId);
+                if (appState.exams.length > 0) {
+                    appState.currentExamId = appState.exams[0].id;
+                } else {
+                    appState.currentExamId = null;
+                }
+                renderExamsTab();
+                showToast('Assessment deleted');
+            }
+        }
+
+        function openCreateExamModal() {
+            document.getElementById('modal-create-exam').classList.remove('hidden');
+        }
+
+        function saveNewExam() {
+            const title = document.getElementById('new-exam-title').value.trim() || 'New Assessment';
+            const subject = document.getElementById('new-exam-subject').value.trim() || 'General';
+            const qCount = parseInt(document.getElementById('new-exam-qcount').value) || 10;
+
+            const newExam = {
+                id: `EX_${Date.now()}`,
+                title: title,
+                subject: subject,
+                questionCount: qCount,
+                keys: Array(qCount).fill('A')
+            };
+
+            appState.exams.push(newExam);
+            appState.currentExamId = newExam.id;
+            closeModal('modal-create-exam');
+            renderExamsTab();
+            showToast(`Created exam: ${title}`);
+        }
+
+        function renderCheckerTab() {
+            const examSelect = document.getElementById('checker-exam-select');
+            examSelect.innerHTML = appState.exams.map(e => `<option value="${e.id}">${e.title} (${e.questionCount} Qs)</option>`).join('');
+
+            const studentSelect = document.getElementById('checker-student-select');
+            studentSelect.innerHTML = appState.students.map(s => `<option value="${s.id}">${s.name} (${s.sectionId})</option>`).join('');
+
+            renderCheckerGrid();
+        }
+
+        function renderCheckerGrid() {
+            const examId = document.getElementById('checker-exam-select').value;
+            const exam = appState.exams.find(e => e.id === examId);
+            if (!exam) return;
+
+            const container = document.getElementById('checker-bubbles-container');
+            const options = ['A', 'B', 'C', 'D'];
+
+            container.innerHTML = exam.keys.map((key, qIdx) => {
+                const stuAns = appState.checkerAnswers[qIdx];
+                return `
+                    <div class="glass-card p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+                        <span class="text-xs font-mono font-bold text-slate-400 w-8">Q${qIdx + 1}</span>
+                        <div class="flex items-center space-x-1.5">
+                            ${options.map(opt => {
+                                let cls = 'bubble';
+                                if (stuAns === opt) {
+                                    cls += opt === key ? ' bubble-correct' : ' bubble-wrong';
+                                }
+                                return `<button onclick="setCheckerAnswer(${qIdx}, '${opt}')" class="${cls}">${opt}</button>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            calculateCheckerScore();
+        }
+
+        function setCheckerAnswer(qIdx, option) {
+            appState.checkerAnswers[qIdx] = option;
+            renderCheckerGrid();
+        }
+
+        function simulateCameraScan() {
+            const examId = document.getElementById('checker-exam-select').value;
+            const exam = appState.exams.find(e => e.id === examId);
+            const opts = ['A', 'B', 'C', 'D'];
+            if (!exam) return;
+
+            appState.checkerAnswers = {};
+            exam.keys.forEach((key, idx) => {
+                const correct = Math.random() < 0.8;
+                appState.checkerAnswers[idx] = correct ? key : opts[Math.floor(Math.random() * opts.length)];
+            });
+
+            renderCheckerGrid();
+            showToast('OMR Scan completed successfully');
+        }
+
+        function calculateCheckerScore() {
+            const examId = document.getElementById('checker-exam-select').value;
+            const exam = appState.exams.find(e => e.id === examId);
+            if (!exam) return;
+
+            let score = 0;
+            exam.keys.forEach((key, idx) => {
+                if (appState.checkerAnswers[idx] === key) score++;
+            });
+
+            const percentage = ((score / exam.questionCount) * 100).toFixed(1);
+            document.getElementById('checker-score-card').classList.remove('hidden');
+            document.getElementById('checker-score-text').textContent = `${score} / ${exam.questionCount}`;
+            document.getElementById('checker-percentage-text').textContent = `${percentage}% Score Grade`;
+        }
+
+        function clearCheckerStudentAnswers() {
+            appState.checkerAnswers = {};
+            renderCheckerGrid();
+        }
+
+        function openProfileModal() {
+            showToast('Profile settings active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showToast(msg) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'bg-slate-900 border border-indigo-500/40 text-slate-100 text-xs font-bold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 pointer-events-auto transition-all transform duration-300';
+            toast.innerHTML = `<i class="fa-solid fa-circle-check text-indigo-400"></i> <span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
